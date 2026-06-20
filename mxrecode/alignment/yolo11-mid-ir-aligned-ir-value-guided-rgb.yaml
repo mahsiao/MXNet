@@ -1,0 +1,74 @@
+# Ultralytics YOLO11 object detection model with P3/8 - P5/32 outputs
+
+nc: 80
+scales:
+  n: [0.50, 0.25, 1024]
+  s: [0.50, 0.50, 1024]
+  m: [0.50, 1.00, 512]
+  l: [1.00, 1.00, 512]
+  x: [1.00, 1.50, 512]
+
+channels: 4
+backbone:
+  - [-1, 1, Silence, []]  # 0
+  # visible
+  - [0, 1, SilenceChannel, [0,3]]  # 1
+  - [-1, 1, Conv, [64, 3, 2]] # 2
+  - [-1, 1, Conv, [128, 3, 2]] # 3
+  - [-1, 2, C3k2, [256, False, 0.25]] # 4
+  - [-1, 1, Conv, [256, 3, 2]] # 5
+  - [-1, 2, C3k2, [512, False, 0.25]] # 6 RGB P3
+  - [-1, 1, Conv, [512, 3, 2]] # 7
+  - [-1, 2, C3k2, [512, True]] # 8 RGB P4
+  - [-1, 1, Conv, [1024, 3, 2]] # 9
+  - [-1, 2, C3k2, [1024, True]] # 10 RGB P5
+
+  # infrared
+  - [0, 1, SilenceChannel, [3,4]]  # 11
+  - [-1, 1, Conv, [64, 3, 2]] # 12
+  - [-1, 1, Conv, [128, 3, 2]] # 13
+  - [-1, 2, C3k2, [256, False, 0.25]] # 14
+  - [-1, 1, Conv, [256, 3, 2]] # 15
+  - [-1, 2, C3k2, [512, False, 0.25]] # 16 IR P3
+  - [-1, 1, Conv, [512, 3, 2]] # 17
+  - [-1, 2, C3k2, [512, True]] # 18 IR P4
+  - [-1, 1, Conv, [1024, 3, 2]] # 19
+  - [-1, 2, C3k2, [1024, True]] # 20 IR P5
+
+  # Align IR to RGB at P3/P4/P5, then use Q/K=RGB and V=IR_aligned.
+  - [[16, 6], 1, OffsetGuidedDeformableAlignment, [3, 16, 4.0, 2.0, True, False]] # 21 IR_aligned P3
+  - [[6, 21], 1, IRValueGuidedRGBEnhancement, []] # 22 enhanced RGB P3
+  - [[22, 21], 1, Concat, [1]] # 23 P3 fusion
+  - [-1, 1, Conv, [512, 1, 1]] # 24 fused P3
+
+  - [[18, 8], 1, OffsetGuidedDeformableAlignment, [3, 16, 4.0, 2.0, True, False]] # 25 IR_aligned P4
+  - [[8, 25], 1, IRValueGuidedRGBEnhancement, []] # 26 enhanced RGB P4
+  - [[26, 25], 1, Concat, [1]] # 27 P4 fusion
+  - [-1, 1, Conv, [512, 1, 1]] # 28 fused P4
+
+  - [[20, 10], 1, OffsetGuidedDeformableAlignment, [3, 16, 4.0, 2.0, True, False]] # 29 IR_aligned P5
+  - [[10, 29], 1, IRValueGuidedRGBEnhancement, []] # 30 enhanced RGB P5
+  - [[30, 29], 1, Concat, [1]] # 31 P5 fusion
+  - [-1, 1, Conv, [1024, 1, 1]] # 32 fused P5
+
+  - [-1, 1, SPPF, [1024, 5]] # 33
+  - [-1, 2, C2PSA, [1024]] # 34
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 28], 1, Concat, [1]]
+  - [-1, 2, C3k2, [512, False]] # 37
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 24], 1, Concat, [1]]
+  - [-1, 2, C3k2, [256, False]] # 40
+
+  - [-1, 1, Conv, [256, 3, 2]]
+  - [[-1, 37], 1, Concat, [1]]
+  - [-1, 2, C3k2, [512, False]] # 43
+
+  - [-1, 1, Conv, [512, 3, 2]]
+  - [[-1, 34], 1, Concat, [1]]
+  - [-1, 2, C3k2, [1024, True]] # 46
+
+  - [[40, 43, 46], 1, OBB, [nc, 1]]

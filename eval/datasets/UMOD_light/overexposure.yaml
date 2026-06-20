@@ -1,0 +1,14 @@
+# path:E:\CProject\Dataset\AUMOD\illumination_txts
+#Overexposure : 223
+#Normal       : 262
+#Twilight     : PreTwilight + PostTwilight = 146
+#Dim          : 281
+#Night        : NearNight + Night = 591
+train: E:\CProject\Dataset\AUMOD\illumination_txts\Overexposure_val.txt
+val: E:\CProject\Dataset\AUMOD\illumination_txts\Overexposure_val.txt # 840 images
+
+nc: 11
+
+names: [ "car", "suv", "van", "bus", "freight_car", "truck", "motorcycle", "trailer", "excavator", "crane", "tank_truck" ]
+
+

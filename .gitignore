@@ -1,0 +1,51 @@
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local environments and logs
+.env
+.venv/
+venv/
+*.log
+
+# Training / validation outputs
+runs/
+**/runs/
+
+# Keep eval source files and dataset yaml configs, ignore generated eval artifacts.
+eval/*
+!eval/*.py
+!eval/datasets/
+!eval/datasets/*.yaml
+
+# Checkpoints / exported models
+ckpts/
+weights/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.tflite
+*.ncnn
+*.bin
+*.param
+
+# Local datasets and generated metadata
+/data/
+/dataset/
+/datasets/
+/Dataset/
+*.cache
+predictions.json
+summary.csv
+summary.txt
+paper_data.txt

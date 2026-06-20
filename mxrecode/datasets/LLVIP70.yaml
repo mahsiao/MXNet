@@ -1,0 +1,11 @@
+# KAIST.yaml
+path: D:\CProject\Dual\Datasets\LLVIP70
+# train and val data as 1) directory: path/images/
+train: images/visible/train  # 7601 images
+val:   images/visible/val # 2257 images
+
+# number of classes
+nc: 1
+channels: 4
+# class names
+names: [ 'person', ]

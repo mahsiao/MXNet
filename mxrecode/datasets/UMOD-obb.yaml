@@ -1,0 +1,9 @@
+# Drone.yaml
+path: E:\CProject\Dataset\AUMOD
+# train and val data as 1) directory: path/images/
+train: train/visible/images  #  images
+val:   val/visible/images #  images
+
+nc: 11
+
+names: [ "car", "suv", "van", "bus", "freight_car", "truck", "motorcycle", "trailer", "excavator", "crane", "tank_truck" ]

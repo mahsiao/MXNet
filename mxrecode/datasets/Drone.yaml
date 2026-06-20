@@ -1,0 +1,36 @@
+#dataset/  # Root directory of the dataset
+#├── train/  # Store training data
+#│   ├── visible/  # Data related to visible light images
+#│   │   ├── images/  # Visible light image files
+#│   │   └── labels/  # Label files for visible light images (e.g., annotation information)
+#│   └── infrared/  # Data related to infrared images
+#│       ├── images/  # Infrared image files
+#│       └── labels/  # Label files for infrared images (e.g., annotation information)
+#└── val/  # Store validation data
+#    ├── visible/  # Data related to visible light images
+#    │   ├── images/  # Visible light image files
+#    │   └── labels/  # Label files for visible light images (e.g., annotation information)
+#    └── infrared/  # Data related to infrared images
+#        ├── images/  # Infrared image files
+#        └── labels/  # Label files for infrared images (e.g., annotation information)
+#
+#---------------------------------------------------------------------
+
+# Drone.yaml
+path: E:\CProject\Dataset\DroneVehicle
+# train and val data as 1) directory: path/images/
+train: train/visible/images  #  images
+val:   val/visible/images #  images
+
+# number of classes0: car
+#1: bus
+#2: van
+#3: truck
+#4: feright car
+
+nc: 5
+
+# class names
+# names: [ "feright_car", "car", "truck", "bus", "van"]
+
+names: [ "car", "bus", "van", "truck", "freight_car"]
