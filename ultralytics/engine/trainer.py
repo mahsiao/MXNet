@@ -389,6 +389,7 @@ class BaseTrainer:
         self._oom_retries = 0  # OOM auto-reduce counter for first epoch
         while True:
             self.epoch = epoch
+            unwrap_model(self.model).current_epoch = epoch
             self.run_callbacks("on_train_epoch_start")
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")  # suppress 'Detected lr_scheduler.step() before optimizer.step()'
@@ -483,8 +484,9 @@ class BaseTrainer:
                 # Log
                 if RANK in {-1, 0}:
                     loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
+                    col_width = max(11, *(len(str(x)) + 1 for x in self.loss_names))
                     pbar.set_description(
-                        ("%11s" * 2 + "%11.4g" * (2 + loss_length))
+                        (f"%{col_width}s" * 2 + f"%{col_width}.4g" * (2 + loss_length))
                         % (
                             f"{epoch + 1}/{self.epochs}",
                             f"{self._get_memory():.3g}G",  # (GB) GPU memory util

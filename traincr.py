@@ -8,23 +8,36 @@ warnings.filterwarnings('ignore')
 
 MODEL_CONFIGS = {
     # P3 illumination/fusion comparison
-    "p3_illumination_residual_fusion": "mxrecode/fusion/yolo11-mid-p3-illumination-residual-fusion.yaml",
-    "p3_cifusion": "mxrecode/fusion/yolo11-mid-p3-cifusion.yaml",
-    "p3_cifusion_v6": "mxrecode/fusion/yolo11-mid-p3-cifusion-v6.yaml",
-    "p3_lifadd": "mxrecode/fusion/yolo11-mid-p3-lifadd.yaml",
+    # "p3_illumination_residual_fusion": "mxrecode/fusion/yolo11-mid-p3-illumination-residual-fusion.yaml",
+    # "p3_cifusion": "mxrecode/fusion/yolo11-mid-p3-cifusion.yaml",
+    # "p3_cifusion_v6": "mxrecode/fusion/yolo11-mid-p3-cifusion-v6.yaml",
+    # "p3_lifadd": "mxrecode/fusion/yolo11-mid-p3-lifadd.yaml",
+    "p3_mid-p3":"mxrecode/baseline/yolo11-mid-p3.yaml",
 
     # P3/P4/P5 illumination/fusion comparison
-    "mid_illumination_residual_fusion": "mxrecode/fusion/yolo11-mid-illumination-residual-fusion.yaml",
-    "mid_cifusion": "mxrecode/fusion/yolo11-mid-cifusion.yaml",
-    "mid_cifusion_v6": "mxrecode/fusion/yolo11-mid-cifusion-v6.yaml",
-    "mid_lifadd": "mxrecode/fusion/yolo11-mid-lifadd.yaml",
+    # "mid_illumination_residual_fusion": "mxrecode/fusion/yolo11-mid-illumination-residual-fusion.yaml",
+    # "mid_cifusion": "mxrecode/fusion/yolo11-mid-cifusion.yaml",
+    # "mid_cifusion_v6": "mxrecode/fusion/yolo11-mid-cifusion-v6.yaml",
+    # "mid_lifadd": "mxrecode/fusion/yolo11-mid-lifadd.yaml",
+}
+
+CONTRAST_MI_LAYERS = {
+    "p3_illumination_residual_fusion": [7, 13, 15],
+    "p3_cifusion": [6, 12, 15],
+    "p3_mid-p3": [6, 12, 14],
+    "p3_cifusion_v6": [6, 12, 15],
+    "p3_lifadd": [7, 13, 15],
+    "mid_illumination_residual_fusion": [7, 17, 22],
+    "mid_cifusion": [6, 16, 23],
+    "mid_cifusion_v6": [6, 16, 23],
+    "mid_lifadd": [7, 17, 22],
 }
 
 TRAIN_ARGS = dict(
     data=r"mxrecode/datasets/DV128-obb.yaml",
     cache=False,
     imgsz=640,
-    epochs=10,
+    epochs=100,
     batch=16,
     close_mosaic=5,
     workers=0,
@@ -36,6 +49,9 @@ TRAIN_ARGS = dict(
     # fraction=0.2,
     channels=4,
     project="DVOBB",
+    contrast_mi_gain=0.1,
+    contrast_mi_stop_ratio=0.3,
+    contrast_mi_stop_epoch=-1,
 )
 
 
@@ -44,8 +60,9 @@ def train_variant(variant, tag=None):
     # model.info(True, True)
     # model.load("yolov8n.pt")  # loading pretrain weights
     name = f"{tag}_{variant}" if tag else variant
+    train_args = {**TRAIN_ARGS, "contrast_mi_layers": CONTRAST_MI_LAYERS[variant]}
     start = time.perf_counter()
-    model.train(**TRAIN_ARGS, name=name)
+    model.train(**train_args, name=name)
     return time.perf_counter() - start
 
 

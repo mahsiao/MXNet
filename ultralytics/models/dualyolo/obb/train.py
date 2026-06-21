@@ -72,7 +72,9 @@ class OBBTrainer(dualyolo.detect.DetectionTrainer):
 
     def get_validator(self):
         """Return an instance of OBBValidator for validation of YOLO model."""
-        self.loss_names = "box_loss", "cls_loss", "dfl_loss", "angle_loss"
+        self.loss_names = ("box_loss", "cls_loss", "dfl_loss", "angle_loss")
+        if getattr(self.args, "contrast_mi_gain", 0.0) > 0:
+            self.loss_names += ("mi_loss",)
         return dualyolo.obb.OBBValidator(
             self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
         )
@@ -139,7 +141,9 @@ class OBBMultimodalTrainer(dualyolo.detect.MultimodalDetectionTrainer):
 
     def get_validator(self):
         """Return an instance of OBBValidator for validation of YOLO model."""
-        self.loss_names = "box_loss", "cls_loss", "dfl_loss", "angle_loss"
+        self.loss_names = ("box_loss", "cls_loss", "dfl_loss", "angle_loss")
+        if getattr(self.args, "contrast_mi_gain", 0.0) > 0:
+            self.loss_names += ("mi_loss",)
         return dualyolo.obb.OBBValidator(
             self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
         )

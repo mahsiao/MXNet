@@ -39,12 +39,23 @@ MODEL_CONFIGS = {
     "mid_lifadd": "mxrecode/fusion/yolo11-mid-lifadd.yaml",
 }
 
+CONTRAST_MI_LAYERS = {
+    "p3_illumination_residual_fusion": [7, 13, 15],
+    "p3_cifusion": [6, 12, 15],
+    "p3_cifusion_v6": [6, 12, 15],
+    "p3_lifadd": [7, 13, 15],
+    "mid_illumination_residual_fusion": [7, 17, 22],
+    "mid_cifusion": [6, 16, 23],
+    "mid_cifusion_v6": [6, 16, 23],
+    "mid_lifadd": [7, 17, 22],
+}
+
 
 TRAIN_ARGS = dict(
     data=r"mxrecode/datasets/DV128-obb.yaml",
     cache=False,
     imgsz=640,
-    epochs=10,
+    epochs=100,
     batch=16,
     close_mosaic=5,
     workers=0,
@@ -56,6 +67,9 @@ TRAIN_ARGS = dict(
     # fraction=0.2,
     channels=4,
     project="DVOBB",
+    contrast_mi_gain=0.1,
+    contrast_mi_stop_ratio=0.3,
+    contrast_mi_stop_epoch=-1,
 )
 
 
@@ -64,7 +78,8 @@ def train_variant(variant, tag=None):
     # model.info(True, True)
     # model.load("yolov8n.pt")  # loading pretrain weights
     name = f"{tag}_{variant}" if tag else variant
-    model.train(**TRAIN_ARGS, name=name)
+    train_args = {**TRAIN_ARGS, "contrast_mi_layers": CONTRAST_MI_LAYERS[variant]}
+    model.train(**train_args, name=name)
 
 
 def parse_args():

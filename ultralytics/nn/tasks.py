@@ -184,6 +184,15 @@ class BaseModel(torch.nn.Module):
             (torch.Tensor): The last output of the model.
         """
         y, dt, embeddings = [], [], []  # outputs
+        self.loss_features = {}
+        args = getattr(self, "args", None)
+        capture_layers = getattr(args, "contrast_mi_layers", None)
+        if isinstance(capture_layers, str):
+            capture_layers = [int(i) for i in capture_layers.replace(" ", "").split(",") if i]
+        capture_layers = list(capture_layers or [])
+        capture_layer_names = ("rgb_p3", "ir_p3", "fusion_p3")
+        capture_layer_map = {layer: capture_layer_names[i] if i < len(capture_layer_names) else layer for i, layer in enumerate(capture_layers)}
+        capture_layers = set(capture_layers)
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
         for m in self.model:
@@ -192,6 +201,8 @@ class BaseModel(torch.nn.Module):
             if profile:
                 self._profile_one_layer(m, x, dt)
             x = m(x)  # run
+            if m.i in capture_layers and isinstance(x, torch.Tensor):
+                self.loss_features[capture_layer_map[m.i]] = x
             y.append(x if m.i in self.save else None)  # save output
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
@@ -345,6 +356,8 @@ class BaseModel(torch.nn.Module):
 
         if preds is None:
             preds = self.forward(batch["img"])
+        if isinstance(preds, dict) and getattr(self, "loss_features", None):
+            preds["loss_features"] = self.loss_features
         return self.criterion(preds, batch)
 
     def init_criterion(self):

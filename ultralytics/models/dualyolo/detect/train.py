@@ -208,7 +208,8 @@ class DetectionTrainer(BaseTrainer):
 
     def progress_string(self):
         """Return a formatted string of training progress with epoch, GPU memory, loss, instances and size."""
-        return ("\n" + "%11s" * (4 + len(self.loss_names))) % (
+        col_width = max(11, *(len(str(x)) + 1 for x in self.loss_names))
+        return ("\n" + f"%{col_width}s" * (4 + len(self.loss_names))) % (
             "Epoch",
             "GPU_mem",
             *self.loss_names,
@@ -345,7 +346,8 @@ class MultimodalDetectionTrainer(BaseTrainer):
 
     def progress_string(self):
         """Returns a formatted string of training progress with epoch, GPU memory, loss, instances and size."""
-        return ("\n" + "%11s" * (4 + len(self.loss_names))) % (
+        col_width = max(11, *(len(str(x)) + 1 for x in self.loss_names))
+        return ("\n" + f"%{col_width}s" * (4 + len(self.loss_names))) % (
             "Epoch",
             "GPU_mem",
             *self.loss_names,

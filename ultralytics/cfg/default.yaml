@@ -107,6 +107,10 @@ pose: 12.0 # (float) pose loss gain (pose tasks)
 kobj: 1.0 # (float) keypoint objectness loss gain (pose tasks)
 rle: 1.0 # (float) rle loss gain (pose tasks)
 angle: 1.0 # (float) oriented angle loss gain (obb tasks)
+contrast_mi_gain: 0.0 # (float) P3 RGB/IR mutual-information feature loss gain (0.0=disable)
+contrast_mi_layers: [] # (list[int]) [RGB P3, IR P3, fused P3] layers used by contrast_mi_gain
+contrast_mi_stop_ratio: 0.3 # (float) stop contrast_mi_loss after this fraction of total epochs
+contrast_mi_stop_epoch: -1 # (int) explicit stop epoch for contrast_mi_loss, -1 uses contrast_mi_stop_ratio
 nbs: 64 # (int) nominal batch size used for loss normalization
 hsv_h: 0.015 # (float) HSV hue augmentation fraction
 hsv_s: 0.7 # (float) HSV saturation augmentation fraction

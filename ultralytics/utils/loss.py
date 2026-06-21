@@ -64,6 +64,55 @@ class ContrastFeatureLossMutualInfo(nn.Module):
         final_loss = total_loss / 3
         return final_loss
 
+class P3ContrastFeatureLossMutualInfo(nn.Module):
+    """Mutual-information-style feature consistency loss for RGB/IR P3 features."""
+
+    def __init__(self, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+
+    def mutual_information(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Approximate MI with the Gaussian relation between correlation and mutual information."""
+        if x.shape != y.shape:
+            raise ValueError(f"contrast_mi_loss requires matched feature shapes, got {tuple(x.shape)} and {tuple(y.shape)}.")
+
+        b = x.shape[0]
+        c = x.shape[1]
+        x = x.reshape(b, c, -1)
+        y = y.reshape(b, c, -1)
+
+        x = x - x.mean(dim=2, keepdim=True)
+        y = y - y.mean(dim=2, keepdim=True)
+        cov_xy = (x * y).mean(dim=2)
+        var_x = x.square().mean(dim=2).clamp_min(self.eps)
+        var_y = y.square().mean(dim=2).clamp_min(self.eps)
+        rho = (cov_xy / (var_x.sqrt() * var_y.sqrt() + self.eps)).clamp(-0.999, 0.999)
+        mi = -0.5 * torch.log1p(-rho.square() + self.eps)
+        return mi.mean()
+
+    def forward(self, features):
+        """Return a positive loss; larger fusion-RGB/IR mutual information gives a smaller value."""
+        if isinstance(features, dict):
+            rgb = features.get("rgb_p3", features.get(6))
+            ir = features.get("ir_p3", features.get(16))
+            fusion = features.get("fusion_p3")
+        else:
+            if len(features) < 3:
+                raise ValueError("contrast_mi_loss requires [rgb_p3, ir_p3, fusion_p3] features.")
+            rgb, ir, fusion = features[0], features[1], features[2]
+
+        if rgb is None or ir is None or fusion is None:
+            keys = list(features) if isinstance(features, dict) else f"{len(features)} tensors"
+            raise ValueError(f"contrast_mi_loss requires rgb_p3, ir_p3 and fusion_p3 features, got {keys}.")
+
+        mi_rgb = self.mutual_information(fusion, rgb)
+        mi_ir = self.mutual_information(fusion, ir)
+        return torch.exp(-(mi_rgb + mi_ir) * 0.5)
+
+
+ContrastFeatureLossMutualInfo = P3ContrastFeatureLossMutualInfo
+
+
 class VarifocalLoss(nn.Module):
     """Varifocal loss by Zhang et al.
 
@@ -1037,6 +1086,21 @@ class v8OBBLoss(v8DetectionLoss):
             topk2=tal_topk2,
         )
         self.bbox_loss = RotatedBboxLoss(self.reg_max).to(self.device)
+        self.model = model
+        self.contrast_mi_loss = P3ContrastFeatureLossMutualInfo().to(self.device)
+        self.contrast_mi_gain = float(getattr(self.hyp, "contrast_mi_gain", 0.0) or 0.0)
+        self.contrast_mi_stop_ratio = float(getattr(self.hyp, "contrast_mi_stop_ratio", 0.3) or 0.0)
+        self.contrast_mi_stop_epoch = int(getattr(self.hyp, "contrast_mi_stop_epoch", -1) or -1)
+        if self.contrast_mi_stop_epoch < 0 and self.contrast_mi_stop_ratio > 0:
+            total_epochs = int(getattr(self.hyp, "epochs", 0) or 0)
+            self.contrast_mi_stop_epoch = math.ceil(total_epochs * self.contrast_mi_stop_ratio) if total_epochs else -1
+
+    def contrast_mi_active(self) -> bool:
+        """Return True while contrast_mi_loss should be applied in the current training epoch."""
+        if self.contrast_mi_gain <= 0:
+            return False
+        current_epoch = int(getattr(self.model, "current_epoch", 0))
+        return self.contrast_mi_stop_epoch < 0 or current_epoch < self.contrast_mi_stop_epoch
 
     def preprocess(self, targets: torch.Tensor, batch_size: int, scale_tensor: torch.Tensor) -> torch.Tensor:
         """Preprocess targets for oriented bounding box detection."""
@@ -1058,7 +1122,7 @@ class v8OBBLoss(v8DetectionLoss):
 
     def loss(self, preds: dict[str, torch.Tensor], batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """Calculate and return the loss for oriented bounding box detection."""
-        loss = torch.zeros(4, device=self.device)  # box, cls, dfl, angle
+        loss = torch.zeros(5 if self.contrast_mi_gain > 0 else 4, device=self.device)  # box, cls, dfl, angle, contrast_mi
         pred_distri, pred_scores, pred_angle = (
             preds["boxes"].permute(0, 2, 1).contiguous(),
             preds["scores"].permute(0, 2, 1).contiguous(),
@@ -1135,7 +1199,17 @@ class v8OBBLoss(v8DetectionLoss):
         loss[2] *= self.hyp.dfl  # dfl gain
         loss[3] *= self.hyp.angle  # angle gain
 
-        return loss * batch_size, loss.detach()  # loss(box, cls, dfl, angle)
+        if self.contrast_mi_active():
+            loss_features = preds.get("loss_features")
+            if loss_features:
+                loss[4] = self.contrast_mi_loss(loss_features) * self.contrast_mi_gain
+            elif torch.is_grad_enabled():
+                raise ValueError(
+                    "contrast_mi_gain is enabled, but no loss_features were captured. "
+                    "Set contrast_mi_layers=[rgb_p3, ir_p3, fusion_p3]."
+                )
+
+        return loss * batch_size, loss.detach()  # loss(box, cls, dfl, angle[, contrast_mi])
 
     def bbox_decode(
         self, anchor_points: torch.Tensor, pred_dist: torch.Tensor, pred_angle: torch.Tensor
