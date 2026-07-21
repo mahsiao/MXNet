@@ -12,7 +12,8 @@ MODEL_CONFIGS = {
     # "p3_cifusion": "mxrecode/fusion/yolo11-mid-p3-cifusion.yaml",
     # "p3_cifusion_v6": "mxrecode/fusion/yolo11-mid-p3-cifusion-v6.yaml",
     # "p3_lifadd": "mxrecode/fusion/yolo11-mid-p3-lifadd.yaml",
-    "p3_mid-p3":"mxrecode/baseline/yolo11-mid-p3.yaml",
+    # "p3_mid-p3": "mxrecode/baseline/yolo11-mid-p3.yaml",
+    "p3_ir_afab_sfem": "mxrecode/baseline/yolo11-mid-p3-ir-afab-sfem.yaml",
 
     # P3/P4/P5 illumination/fusion comparison
     # "mid_illumination_residual_fusion": "mxrecode/fusion/yolo11-mid-illumination-residual-fusion.yaml",
@@ -25,6 +26,7 @@ CONTRAST_MI_LAYERS = {
     "p3_illumination_residual_fusion": [7, 13, 15],
     "p3_cifusion": [6, 12, 15],
     "p3_mid-p3": [6, 12, 14],
+    "p3_ir_afab_sfem": [6, 12, 14],
     "p3_cifusion_v6": [6, 12, 15],
     "p3_lifadd": [7, 13, 15],
     "mid_illumination_residual_fusion": [7, 17, 22],
@@ -60,7 +62,9 @@ def train_variant(variant, tag=None):
     # model.info(True, True)
     # model.load("yolov8n.pt")  # loading pretrain weights
     name = f"{tag}_{variant}" if tag else variant
-    train_args = {**TRAIN_ARGS, "contrast_mi_layers": CONTRAST_MI_LAYERS[variant]}
+    train_args = {**TRAIN_ARGS}
+    if variant in CONTRAST_MI_LAYERS:
+        train_args["contrast_mi_layers"] = CONTRAST_MI_LAYERS[variant]
     start = time.perf_counter()
     model.train(**train_args, name=name)
     return time.perf_counter() - start

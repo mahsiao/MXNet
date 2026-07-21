@@ -8,6 +8,12 @@ from pathlib import Path
 from ultralytics.models import yolo
 from ultralytics.nn.tasks import OBBModel
 from ultralytics.utils import DEFAULT_CFG, RANK
+from ultralytics.utils.loss import parse_contrast_mi_layers
+
+
+def contrast_mi_enabled(args) -> bool:
+    """Return True when mutual-information feature loss has all required settings."""
+    return getattr(args, "contrast_mi_gain", 0.0) > 0 and len(parse_contrast_mi_layers(getattr(args, "contrast_mi_layers", None))) >= 3
 
 
 class OBBTrainer(yolo.detect.DetectionTrainer):
@@ -73,7 +79,7 @@ class OBBTrainer(yolo.detect.DetectionTrainer):
     def get_validator(self):
         """Return an instance of OBBValidator for validation of YOLO model."""
         self.loss_names = ("box_loss", "cls_loss", "dfl_loss", "angle_loss")
-        if getattr(self.args, "contrast_mi_gain", 0.0) > 0:
+        if contrast_mi_enabled(self.args):
             self.loss_names += ("mi_loss",)
         return yolo.obb.OBBValidator(
             self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks

@@ -19,6 +19,7 @@ Examples:
 """
 from .alignment import OffsetGuidedDeformableAlignment
 from .fusion import CIFusion, CIFusion_v6, LIF, LIFAdd, LP, ResidualIlluminationFusion
+from .ir_afab_sfem import IR_AFAB, SFEM
 from .test_modules import (
     BidirectionalKVGuidedEnhancement,
     BidirectionalValueGuidedEnhancement,
@@ -126,6 +127,8 @@ __all__ = (
     "LIFAdd",
     "LP",
     "ResidualIlluminationFusion",
+    "IR_AFAB",
+    "SFEM",
     "BidirectionalKVGuidedEnhancement",
     "BidirectionalValueGuidedEnhancement",
     "IRGuidedRGBEnhancement",

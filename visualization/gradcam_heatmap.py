@@ -25,7 +25,7 @@ from visualization.feature_heatmap import (
 warnings.filterwarnings("ignore")
 
 
-DEFAULT_LAYERS = [6, 16, 31]
+DEFAULT_LAYERS = [6, 12, 14]
 DEFAULT_PROJECT = Path("visualization/runs/gradcam")
 DEFAULT_LABEL_KIND = "fixlabel"
 
@@ -325,10 +325,10 @@ def visualize_gradcam(
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate Grad-CAM heatmaps for RGBT OBB models.")
-    parser.add_argument("--model", default=r"D:\CProject\MXNet\eval\ckpts\DV\DV-11n-mid.pt")
-    parser.add_argument("--source", default=r"E:\CProject\Dataset\DVOBB\train\visible\images\00027.jpg")
+    parser.add_argument("--model", default=r"D:\CProject\MXNet\eval\ckpts\DV\DV-11n-mid-p3.pt")
+    parser.add_argument("--source", default=r"E:\CProject\Dataset\DVOBB\train\visible\images\11533.jpg")
     parser.add_argument("--layers", nargs="+", type=int, default=DEFAULT_LAYERS)
-    parser.add_argument("--name", default="dv_00027_gradcam")
+    parser.add_argument("--name", default="dv_11533_gradcam")
     parser.add_argument("--project", default=str(DEFAULT_PROJECT))
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--alpha", type=float, default=0.45)

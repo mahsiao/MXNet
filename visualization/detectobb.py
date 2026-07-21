@@ -11,10 +11,13 @@ from ultralytics import DualYOLO
 from ultralytics.engine.results import Results
 from ultralytics.utils import ops
 
+"""
+09720
+"""
 drone_ckpt = r'D:\CProject\MXNet\eval\ckpts\DV\DV-11n-mid.pt'
-umod = r'E:\CProject\Dataset\AUMOD\train\visible\images\00007.jpg'
+umod = r'E:\CProject\Dataset\DVOBB\train\visible\images\09720.jpg'
 VIS_LINE_WIDTH = 2
-DEFAULT_PROJECT = r"visualization\runs\obb"
+DEFAULT_PROJECT = r""
 IMAGE_SUFFIXES = {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp"}
 
 
@@ -192,9 +195,19 @@ if __name__ == '__main__':
     jobs = [
         {
             "model": drone_ckpt,
-            "source": r"E:\CProject\Dataset\DVOBB\train\visible\images\00007.jpg",
-            "name": "dv_lcaf_p3_00007",
+            "source": r"E:\CProject\Dataset\DVOBB\train\visible\images\12141.jpg",
+            "name": "dv_12141",
         },
+        # {
+        #     "model": drone_ckpt,
+        #     "source": [
+        #         r"E:\CProject\Dataset\DVOBB\train\visible\images\11279.jpg",
+        #         r"E:\CProject\Dataset\DVOBB\train\visible\images\11533.jpg",
+        #         r"E:\CProject\Dataset\DVOBB\train\visible\images\11910.jpg",
+        #         r"E:\CProject\Dataset\DVOBB\train\visible\images\12141.jpg"
+        #     ],
+        #     "name": "dv_0ppt",
+        # },
         # More examples:
         # {
         #     "model": r"D:\CProject\MXNet\eval\ckpts\another_model.pt",

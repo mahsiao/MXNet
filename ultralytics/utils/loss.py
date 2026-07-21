@@ -113,6 +113,23 @@ class P3ContrastFeatureLossMutualInfo(nn.Module):
 ContrastFeatureLossMutualInfo = P3ContrastFeatureLossMutualInfo
 
 
+def parse_contrast_mi_layers(layers: Any) -> list[int]:
+    """Parse contrast_mi_layers from cfg/CLI values into a list of layer indices."""
+    if layers is None:
+        return []
+    if isinstance(layers, str):
+        layers = layers.strip()
+        if not layers:
+            return []
+        if layers.startswith("["):
+            import ast
+
+            layers = ast.literal_eval(layers)
+        else:
+            layers = [x for x in layers.replace(" ", "").split(",") if x]
+    return [int(x) for x in layers]
+
+
 class VarifocalLoss(nn.Module):
     """Varifocal loss by Zhang et al.
 
@@ -1089,6 +1106,8 @@ class v8OBBLoss(v8DetectionLoss):
         self.model = model
         self.contrast_mi_loss = P3ContrastFeatureLossMutualInfo().to(self.device)
         self.contrast_mi_gain = float(getattr(self.hyp, "contrast_mi_gain", 0.0) or 0.0)
+        self.contrast_mi_layers = parse_contrast_mi_layers(getattr(self.hyp, "contrast_mi_layers", None))
+        self.contrast_mi_enabled = self.contrast_mi_gain > 0 and len(self.contrast_mi_layers) >= 3
         self.contrast_mi_stop_ratio = float(getattr(self.hyp, "contrast_mi_stop_ratio", 0.3) or 0.0)
         self.contrast_mi_stop_epoch = int(getattr(self.hyp, "contrast_mi_stop_epoch", -1) or -1)
         if self.contrast_mi_stop_epoch < 0 and self.contrast_mi_stop_ratio > 0:
@@ -1097,7 +1116,7 @@ class v8OBBLoss(v8DetectionLoss):
 
     def contrast_mi_active(self) -> bool:
         """Return True while contrast_mi_loss should be applied in the current training epoch."""
-        if self.contrast_mi_gain <= 0:
+        if not self.contrast_mi_enabled:
             return False
         current_epoch = int(getattr(self.model, "current_epoch", 0))
         return self.contrast_mi_stop_epoch < 0 or current_epoch < self.contrast_mi_stop_epoch
@@ -1122,7 +1141,7 @@ class v8OBBLoss(v8DetectionLoss):
 
     def loss(self, preds: dict[str, torch.Tensor], batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """Calculate and return the loss for oriented bounding box detection."""
-        loss = torch.zeros(5 if self.contrast_mi_gain > 0 else 4, device=self.device)  # box, cls, dfl, angle, contrast_mi
+        loss = torch.zeros(5 if self.contrast_mi_enabled else 4, device=self.device)  # box, cls, dfl, angle, contrast_mi
         pred_distri, pred_scores, pred_angle = (
             preds["boxes"].permute(0, 2, 1).contiguous(),
             preds["scores"].permute(0, 2, 1).contiguous(),

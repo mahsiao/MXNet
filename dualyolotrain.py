@@ -78,7 +78,9 @@ def train_variant(variant, tag=None):
     # model.info(True, True)
     # model.load("yolov8n.pt")  # loading pretrain weights
     name = f"{tag}_{variant}" if tag else variant
-    train_args = {**TRAIN_ARGS, "contrast_mi_layers": CONTRAST_MI_LAYERS[variant]}
+    train_args = {**TRAIN_ARGS}
+    if variant in CONTRAST_MI_LAYERS:
+        train_args["contrast_mi_layers"] = CONTRAST_MI_LAYERS[variant]
     model.train(**train_args, name=name)
 
 

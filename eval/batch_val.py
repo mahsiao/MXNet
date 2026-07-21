@@ -14,17 +14,62 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ultralytics.models import DualYOLO
-from ultralytics.utils.torch_utils import model_info
+from ultralytics.utils.torch_utils import get_flops_with_torch_profiler, model_info
 
 warnings.filterwarnings("ignore")
 
 # python batch_val.py ckpts/DV
 DEFAULT_DATA = ROOT / "eval" / "datasets" / "DVOBB.yaml"
 DEFAULT_PROJECT = ROOT / "eval" / "runs" / "batch_val"
+DEFAULT_WEIGHTS_DIR = ROOT / "eval" / "ckpts" / "DV"
+
+# Leave empty to validate all .pt files under DEFAULT_WEIGHTS_DIR.
+# Fill with file names or stems to validate only selected weights, e.g.
+# WEIGHT_NAMES = ["yolo11-mid-p3-obb", "yolo11-mid-p3-cifusion.pt"]
+WEIGHT_NAMES = [
+    # "DV-11n-mid-p3-ir_guided_rgb.pt",
+    # "DV-11n-mid-p3-ir_value_guided_rgb.pt",
+    # "DV-11n-mid-p3-rgb_guided_ir.pt",
+    # "DV-11n-mid-p3-rgb_value_guided_ir.pt",
+    "DV-11n-mid-p3.pt",
+    # "DV-11n-mid-p3_bidirectional_kv_guided.pt",
+    # "DV-11n-mid-p3_bidirectional_value_guided.pt",
+    "DV-11n-mid-p3_cifusion.pt",
+    "DV-11n-mid-p3_cifusion_v6.pt",
+    "DV-11n-mid-p3_illumination_residual_fusion.pt",
+    "DV-11n-mid-p3_lifadd.pt",
+    "DV-11n-mid.pt",
+    # "DV-11n-mid_bidirectional_kv_guided.pt",
+    # "DV-11n-mid_bidirectional_value_guided.pt",
+    "DV-11n-mid_cifusion.pt",
+    "DV-11n-mid_cifusion_v6.pt",
+    "DV-11n-mid_illumination_residual_fusion.pt",
+    # "DV-11n-mid_ir_guided_rgb.pt",
+    # "DV-11n-mid_ir_value_guided_rgb.pt",
+    # "DV-11n-mid_rgb_guided_ir.pt",
+    # "DV-11n-mid_rgb_value_guided_ir.pt",
+]
 
 
 def get_weight_size(path):
     return f"{os.stat(path).st_size / 1024 / 1024:.1f}"
+
+
+def get_model_profile(model, imgsz):
+    n_l, n_p, n_g, flops = model_info(model.model, imgsz=imgsz)
+    if flops:
+        return n_l, n_p, n_g, flops
+
+    try:
+        flops = get_flops_with_torch_profiler(model.model, imgsz=imgsz)
+    except Exception as e:
+        print(f"torch.profiler FLOPs failed: {e}")
+        flops = 0.0
+    return n_l, n_p, n_g, flops
+
+
+def format_gflops(flops):
+    return f"{flops:.1f}" if flops and flops > 0 else "N/A"
 
 
 def collect_weights(items):
@@ -38,6 +83,32 @@ def collect_weights(items):
         else:
             print(f"Skip invalid weight path: {item}")
     return weights
+
+
+def collect_named_weights(weights_dir, names):
+    weights_dir = Path(weights_dir)
+    weights = []
+    for name in names:
+        path = Path(name)
+        if not path.suffix:
+            path = path.with_suffix(".pt")
+        if not path.is_absolute():
+            path = weights_dir / path
+        if path.is_file() and path.suffix.lower() == ".pt":
+            weights.append(path)
+        else:
+            print(f"Skip missing weight name: {name} -> {path}")
+    return weights
+
+
+def resolve_weights(args):
+    if args.weight_names:
+        return collect_named_weights(args.weights_dir, args.weight_names)
+    if args.weights:
+        return collect_weights(args.weights)
+    if WEIGHT_NAMES:
+        return collect_named_weights(args.weights_dir, WEIGHT_NAMES)
+    return collect_weights([args.weights_dir])
 
 
 def safe_metric(results_dict, key, default=np.nan):
@@ -55,12 +126,12 @@ def format_duration(seconds):
     return f"{seconds}s"
 
 
-def summarize_result(model, result, weight_path):
+def summarize_result(model, result, weight_path, imgsz):
     preprocess = result.speed["preprocess"]
     inference = result.speed["inference"]
     postprocess = result.speed["postprocess"]
     total = preprocess + inference + postprocess
-    n_l, n_p, n_g, flops = model_info(model.model)
+    n_l, n_p, n_g, flops = get_model_profile(model, imgsz)
 
     length = result.box.p.size
     f1 = float(np.mean(result.box.f1[:length])) if length else np.nan
@@ -70,7 +141,7 @@ def summarize_result(model, result, weight_path):
         "model": Path(weight_path).stem,
         "weight": str(weight_path),
         "save_dir": str(result.save_dir),
-        "GFLOPs": f"{flops:.1f}",
+        "GFLOPs": format_gflops(flops),
         "params": n_p,
         "size_MB": get_weight_size(weight_path),
         "precision": safe_metric(result.results_dict, "metrics/precision(B)"),
@@ -144,7 +215,7 @@ def validate_one(weight_path, args):
         name=Path(weight_path).stem,
         device=args.device,
     )
-    row = summarize_result(model, result, weight_path)
+    row = summarize_result(model, result, weight_path, args.imgsz)
     row["val_seconds"] = time.perf_counter() - start
     row["val_time"] = format_duration(row["val_seconds"])
     return row
@@ -154,8 +225,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Batch validate DualYOLO OBB models on one dataset.")
     parser.add_argument(
         "weights",
-        nargs="+",
-        help="One or more .pt files or directories containing .pt weights.",
+        nargs="*",
+        help="Optional .pt files or directories containing .pt weights. Defaults to ckpts/DV.",
+    )
+    parser.add_argument("--weights-dir", default=str(DEFAULT_WEIGHTS_DIR), help="Directory used by --weight-names.")
+    parser.add_argument(
+        "--weight-names",
+        nargs="*",
+        default=None,
+        help="Selected weight file names or stems under --weights-dir, e.g. yolo11-mid-p3 best.pt.",
     )
     parser.add_argument("--data", default=str(DEFAULT_DATA), help="Dataset YAML.")
     parser.add_argument("--split", default="val", help="Dataset split.")
@@ -171,9 +249,10 @@ if __name__ == "__main__":
     args = parse_args()
     args.data = Path(args.data)
     args.project = Path(args.project)
+    args.weights_dir = Path(args.weights_dir)
     total_start = time.perf_counter()
 
-    weights = collect_weights(args.weights)
+    weights = resolve_weights(args)
     if not weights:
         raise FileNotFoundError("No .pt weights found.")
 
