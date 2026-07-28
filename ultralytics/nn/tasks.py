@@ -1,4 +1,4 @@
-# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+# Ultralytics 棣冩畬 AGPL-3.0 License - https://ultralytics.com/license
 
 import contextlib
 import pickle
@@ -15,10 +15,16 @@ from ultralytics.nn.modules import (
     OffsetGuidedDeformableAlignment,
     CIFusion,
     CIFusion_v6,
+    FCFS,
+    FCFSPrivateResidual,
+    FCFSShared,
+    FCFSTriAdapt,
+    ISPF,
     LIF,
     LIFAdd,
     LP,
     ResidualIlluminationFusion,
+    SPAF,
     IR_AFAB,
     SFEM,
     BidirectionalKVGuidedEnhancement,
@@ -897,7 +903,7 @@ def torch_safe_load(weight, safe_only=False):
         if e.name == "models":
             raise TypeError(
                 emojis(
-                    f"ERROR ❌️ {weight} appears to be an Ultralytics YOLOv5 model originally trained "
+                    f"ERROR 閴傚矉绗?{weight} appears to be an Ultralytics YOLOv5 model originally trained "
                     f"with https://github.com/ultralytics/yolov5.\nThis model is NOT forwards compatible with "
                     f"YOLOv8 at https://github.com/ultralytics/ultralytics."
                     f"\nRecommend fixes are to train a new model using the latest 'ultralytics' package or to "
@@ -907,13 +913,13 @@ def torch_safe_load(weight, safe_only=False):
         elif e.name == "numpy._core":
             raise ModuleNotFoundError(
                 emojis(
-                    f"ERROR ❌️ {weight} requires numpy>=1.26.1, however numpy=={__import__('numpy').__version__} is installed."
+                    f"ERROR 閴傚矉绗?{weight} requires numpy>=1.26.1, however numpy=={__import__('numpy').__version__} is installed."
                 )
             ) from e
         elif e.name and e.name.startswith("ultralytics."):
             raise ModuleNotFoundError(
                 emojis(
-                    f"ERROR ❌️ {weight} requires missing Ultralytics module '{e.name}'. "
+                    f"ERROR 閴傚矉绗?{weight} requires missing Ultralytics module '{e.name}'. "
                     "Train a new model using the latest 'ultralytics' package or run a command with an official "
                     "Ultralytics model, i.e. 'yolo predict model=yolo26n.pt'"
                 )
@@ -1184,6 +1190,46 @@ def parse_model(d, ch, verbose=True):
             # Light prior encoder consumes RGB/RGBT image input and outputs a single-channel illumination map.
             c2 = 1
             args = [*args]
+        elif m is FCFSShared:
+            # Input f is expected as [visible_feature, infrared_feature].
+            # The module returns the coherence-based shared feature with C channels.
+            if not isinstance(f, list) or len(f) != 2:
+                raise ValueError(f"{m.__name__} requires f=[visible_feature, infrared_feature].")
+            if ch[f[0]] != ch[f[1]]:
+                raise ValueError(f"{m.__name__} requires equal visible/infrared channels, got {ch[f[0]]} and {ch[f[1]]}.")
+            c2 = ch[f[0]]
+            args = [*args]
+        elif m is FCFSPrivateResidual:
+            # Input f is expected as [visible_feature, infrared_feature].
+            # The module returns shared + private residual with C channels.
+            if not isinstance(f, list) or len(f) != 2:
+                raise ValueError(f"{m.__name__} requires f=[visible_feature, infrared_feature].")
+            if ch[f[0]] != ch[f[1]]:
+                raise ValueError(f"{m.__name__} requires equal visible/infrared channels, got {ch[f[0]]} and {ch[f[1]]}.")
+            c2 = ch[f[0]]
+            args = [c2, *args]
+        elif m in frozenset({SPAF, FCFSTriAdapt}):
+            # Input f is expected as [visible_feature, infrared_feature] or
+            # [visible_feature, infrared_feature, illumination_map].
+            if not isinstance(f, list) or len(f) not in (2, 3):
+                raise ValueError(f"{m.__name__} requires f=[visible_feature, infrared_feature] or f=[visible_feature, infrared_feature, illumination_map].")
+            if ch[f[0]] != ch[f[1]]:
+                raise ValueError(f"{m.__name__} requires equal visible/infrared channels, got {ch[f[0]]} and {ch[f[1]]}.")
+            if len(f) == 3 and ch[f[2]] != 1:
+                raise ValueError(f"{m.__name__} requires a single-channel illumination map, got {ch[f[2]]}.")
+            c2 = ch[f[0]]
+            args = [c2, *args]
+        elif m is ISPF:
+            # Input f is expected as [visible_feature, infrared_feature, illumination_map].
+            # The module returns illumination-guided shared/private fusion with C channels.
+            if not isinstance(f, list) or len(f) != 3:
+                raise ValueError(f"{m.__name__} requires f=[visible_feature, infrared_feature, illumination_map].")
+            if ch[f[0]] != ch[f[1]]:
+                raise ValueError(f"{m.__name__} requires equal visible/infrared channels, got {ch[f[0]]} and {ch[f[1]]}.")
+            if ch[f[2]] != 1:
+                raise ValueError(f"{m.__name__} requires a single-channel illumination map, got {ch[f[2]]}.")
+            c2 = ch[f[0]]
+            args = [c2, *args]
         elif m is ResidualIlluminationFusion:
             # Input f is expected as [visible_feature, infrared_feature, illumination_map].
             # The module fuses visible/infrared features and returns one feature map with visible-channel width.
@@ -1379,3 +1425,4 @@ class YOLOEModel:
 
 class YOLOESegModel:
     pass
+

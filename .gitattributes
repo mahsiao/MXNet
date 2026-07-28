@@ -1,0 +1,10 @@
+# .gitattributes
+*.py text eol=lf
+*.yaml text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.pth binary
+*.onnx binary

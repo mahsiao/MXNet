@@ -1,12 +1,11 @@
-# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+# Ultralytics 馃殌 AGPL-3.0 License - https://ultralytics.com/license
 """
 Ultralytics neural network modules.
 
 This module provides access to various neural network components used in Ultralytics models, including convolution
 blocks, attention mechanisms, transformer components, and detection/segmentation heads.
-新增模块时，先在 nn.modules 中实现模块并导出，然后在 tasks.py 中导入，使 parse_model 能通过 YAML 字符串找到该类；
-若模块的输入/输出通道或初始化参数无法由默认规则推断，则需要在 parse_model 中添加对应 elif 分支，最后在模型 YAML 中按层配置使用该模块。
-Examples:
+鏂板妯″潡鏃讹紝鍏堝湪 nn.modules 涓疄鐜版ā鍧楀苟瀵煎嚭锛岀劧鍚庡湪 tasks.py 涓鍏ワ紝浣?parse_model 鑳介€氳繃 YAML 瀛楃涓叉壘鍒拌绫伙紱
+鑻ユā鍧楃殑杈撳叆/杈撳嚭閫氶亾鎴栧垵濮嬪寲鍙傛暟鏃犳硶鐢遍粯璁よ鍒欐帹鏂紝鍒欓渶瑕佸湪 parse_model 涓坊鍔犲搴?elif 鍒嗘敮锛屾渶鍚庡湪妯″瀷 YAML 涓寜灞傞厤缃娇鐢ㄨ妯″潡銆?Examples:
     Visualize a module with Netron
     >>> from ultralytics.nn.modules import Conv
     >>> import torch
@@ -18,7 +17,7 @@ Examples:
     >>> subprocess.run(f"onnxslim {f} {f} && open {f}", shell=True, check=True)  # pip install onnxslim
 """
 from .alignment import OffsetGuidedDeformableAlignment
-from .fusion import CIFusion, CIFusion_v6, LIF, LIFAdd, LP, ResidualIlluminationFusion
+from .fusion import CIFusion, CIFusion_v6, FCFS, FCFSPrivateResidual, FCFSShared, FCFSTriAdapt, ISPF, LIF, LIFAdd, LP, ResidualIlluminationFusion, SPAF
 from .ir_afab_sfem import IR_AFAB, SFEM
 from .test_modules import (
     BidirectionalKVGuidedEnhancement,
@@ -123,6 +122,12 @@ __all__ = (
     "OffsetGuidedDeformableAlignment",
     "CIFusion",
     "CIFusion_v6",
+    "FCFS",
+    "FCFSPrivateResidual",
+    "FCFSShared",
+    "FCFSTriAdapt",
+    "SPAF",
+    "ISPF",
     "LIF",
     "LIFAdd",
     "LP",
@@ -216,3 +221,4 @@ __all__ = (
     "YOLOESegment26",
     "v10Detect",'Silence','SilenceChannel','ChannelToNumber','NumberToChannel',
 )
+
