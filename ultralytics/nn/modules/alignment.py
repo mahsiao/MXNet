@@ -440,6 +440,79 @@ class OffsetGuidedDeformableAlignment(nn.Module):
 
         return f_ir_aligned
 
+
+class NoOffsetDeformableAlignment(nn.Module):
+    """Ablation alignment using a deformable-convolution operator without learned offsets.
+
+    The module keeps the same ``[IR_feature, RGB_feature] -> IR_feature`` interface as
+    :class:`OffsetGuidedDeformableAlignment`, but removes every attention, offset and
+    modulation-mask predictor.  A zero offset and an all-one mask are supplied to
+    ``DeformConv2d``.  Consequently, the sampling grid is fixed and this module is
+    mathematically equivalent to a regular convolution implemented through the DCNv2
+    operator.  It is intended specifically for the ``without offset prediction``
+    ablation experiment.
+    """
+
+    def __init__(
+        self,
+        channels: int,
+        kernel_size: int = 3,
+        use_alignment_residual: bool = False,
+    ) -> None:
+        super().__init__()
+
+        if channels <= 0:
+            raise ValueError("channels must be positive.")
+        if kernel_size <= 0 or kernel_size % 2 == 0:
+            raise ValueError("kernel_size must be a positive odd number.")
+
+        self.num_points = kernel_size * kernel_size
+        self.deformable_conv = DeformConv2d(
+            in_channels=channels,
+            out_channels=channels,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=kernel_size // 2,
+            dilation=1,
+            groups=1,
+            bias=False,
+        )
+        self.norm = nn.BatchNorm2d(channels)
+        self.activation = nn.SiLU(inplace=True)
+        self.use_alignment_residual = use_alignment_residual
+
+    def forward(self, x) -> Tensor:
+        if not isinstance(x, (list, tuple)) or len(x) != 2:
+            raise ValueError(
+                "NoOffsetDeformableAlignment expects [IR_feature, RGB_feature] as input, "
+                f"but got {type(x)} with length {len(x) if isinstance(x, (list, tuple)) else 'N/A'}"
+            )
+
+        f_ir, f_rgb = x
+        OffsetGuidedDeformableAlignment._validate_inputs(f_ir, f_rgb)
+
+        batch, _, height, width = f_ir.shape
+        # DeformConv2d requires an offset tensor even when no offsets are learned.
+        # Use new_zeros/new_ones so device and dtype always match the input feature.
+        zero_offset = f_ir.new_zeros(
+            (batch, 2 * self.num_points, height, width)
+        )
+        unit_mask = f_ir.new_ones(
+            (batch, self.num_points, height, width)
+        )
+
+        f_ir_aligned = self.deformable_conv(
+            f_ir,
+            zero_offset,
+            unit_mask,
+        )
+        f_ir_aligned = self.activation(self.norm(f_ir_aligned))
+
+        if self.use_alignment_residual:
+            f_ir_aligned = f_ir_aligned + f_ir
+
+        return f_ir_aligned
+
 def test_alignment_module() -> None:
     batch_size = 2
     channels = 128

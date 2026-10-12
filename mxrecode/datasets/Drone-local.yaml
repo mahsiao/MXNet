@@ -1,0 +1,8 @@
+# Local Windows dataset configuration for quick tests.
+# Keep this file for the local machine only.
+path: E:\CProject\Dataset\DVOBB
+train: train/visible/images
+val: val/visible/images
+
+nc: 5
+names: ["car", "bus", "van", "truck", "freight_car"]

@@ -1,0 +1,8 @@
+# Server dataset configuration.
+# DVOBB location on the training server.
+path: /home/zkpk/mx/datasets/DVOBB
+train: train/visible/images
+val: val/visible/images
+
+nc: 5
+names: ["car", "bus", "van", "truck", "freight_car"]

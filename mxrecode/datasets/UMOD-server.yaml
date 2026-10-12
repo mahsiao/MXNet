@@ -1,0 +1,7 @@
+# Server dataset configuration for AUMOD/UMOD.
+path: /home/zkpk/mx/datasets/AUMOD
+train: train/visible/images
+val: val/visible/images
+
+nc: 11
+names: ["car", "suv", "van", "bus", "freight_car", "truck", "motorcycle", "trailer", "excavator", "crane", "tank_truck"]

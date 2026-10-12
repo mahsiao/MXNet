@@ -16,7 +16,7 @@ blocks, attention mechanisms, transformer components, and detection/segmentation
     >>> torch.onnx.export(m, x, f)
     >>> subprocess.run(f"onnxslim {f} {f} && open {f}", shell=True, check=True)  # pip install onnxslim
 """
-from .alignment import OffsetGuidedDeformableAlignment
+from .alignment import NoOffsetDeformableAlignment, OffsetGuidedDeformableAlignment
 from .fusion import CIFusion, CIFusion_v6, FCFS, FCFSPrivateResidual, FCFSShared, FCFSTriAdapt, ISPF, LIF, LIFAdd, LP, ResidualIlluminationFusion, SPAF
 from .ir_afab_sfem import IR_AFAB, SFEM
 from .test_modules import (
@@ -120,6 +120,7 @@ from .transformer import (
 
 __all__ = (
     "OffsetGuidedDeformableAlignment",
+    "NoOffsetDeformableAlignment",
     "CIFusion",
     "CIFusion_v6",
     "FCFS",

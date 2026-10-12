@@ -12,6 +12,7 @@ import torch.nn as nn
 
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
+    NoOffsetDeformableAlignment,
     OffsetGuidedDeformableAlignment,
     CIFusion,
     CIFusion_v6,
@@ -1263,7 +1264,7 @@ def parse_model(d, ch, verbose=True):
                 raise ValueError(f"{m.__name__} requires a single-channel LIF weight map, got {ch[f[2]]}.")
             c2 = ch[f[0]]
             args = [*args]
-        elif m is OffsetGuidedDeformableAlignment:
+        elif m in {OffsetGuidedDeformableAlignment, NoOffsetDeformableAlignment}:
             # Input f is expected as [infrared_feature, visible_feature].
             # The module aligns IR to the RGB coordinate system and returns aligned IR.
             if not isinstance(f, list) or len(f) != 2:
