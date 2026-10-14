@@ -12,32 +12,32 @@ from ultralytics.models.dualyolo.model import DualYOLO
 warnings.filterwarnings("ignore")
 
 
-MODEL_CONFIGS = {
-    "p3_ir_afab_sfem": "mxrecode/baseline/yolo11-mid-p3-ir-afab-sfem.yaml",
-}
-
 CONTRAST_MI_LAYERS = {
     "p3_ir_afab_sfem": [6, 12, 14],
 }
 
+MODEL_CONFIGS = {
+
+    # "p3-offset": "mxrecode/alignment/yolo11-mid-p3-offset-alignment.yaml",
+    "p3-no-offset": "mxrecode/alignment/yolo11-mid-p3-no-offset-alignment.yaml",
+    "p2-offset": "mxrecode/alignment/yolo11-mid-p2-offset-alignment.yaml",
+}
+
 TRAIN_ARGS = dict(
-    data="mxrecode/datasets/Drone-obb.server.yaml",
+    data="mxrecode/datasets/Drone-server.yaml",
     cache=False,
     imgsz=640,
-    epochs=100,
-    batch=16,
-    close_mosaic=5,
+    epochs=200,
+    batch=64,
+    close_mosaic=10,
     workers=8,
     device="0",
     optimizer="SGD",
     amp=True,
+    # fraction=0.05,
     channels=4,
-    project="runs/server/DVOBB",
-    contrast_mi_gain=0.1,
-    contrast_mi_stop_ratio=0.3,
-    contrast_mi_stop_epoch=-1,
+    project="runs/DVOBB",
 )
-
 
 def train_variant(variant, tag=None):
     model = DualYOLO(MODEL_CONFIGS[variant])

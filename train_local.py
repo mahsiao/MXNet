@@ -13,21 +13,21 @@ warnings.filterwarnings("ignore")
 
 
 MODEL_CONFIGS = {
-    "p3_ir_afab_sfem": "mxrecode/baseline/yolo11-mid-p3-ir-afab-sfem.yaml",
+    "p3_offset": "mxrecode/alignment/yolo11-mid-p3-offset-alignment.yaml",
 }
 
 TRAIN_ARGS = dict(
     data="mxrecode/datasets/DV128-obb.yaml",
     cache=False,
     imgsz=640,
-    epochs=1,
-    batch=2,
+    epochs=10,
+    batch=16,
     close_mosaic=0,
     workers=0,
     device="0",
     optimizer="SGD",
     amp=True,
-    fraction=0.05,
+    # fraction=0.05,
     channels=4,
     project="runs/local_test/DVOBB",
 )

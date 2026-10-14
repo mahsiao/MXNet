@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ultralytics.models import DualYOLO
-from ultralytics.utils.torch_utils import get_flops_with_torch_profiler, model_info
+from ultralytics.utils.torch_utils import get_flops, get_flops_with_torch_profiler, model_info
 
 warnings.filterwarnings("ignore")
 
@@ -32,20 +32,22 @@ WEIGHT_NAMES = [
     # "DV-11n-mid-p3-rgb_guided_ir.pt",
     # "DV-11n-mid-p3-rgb_value_guided_ir.pt",
     "DV-11n-mid-p3.pt",
-    "DV-11n-mid-fcfs-fcfsshared.pt",
-    "DV-11n-mid-p3-fcfsshared.pt",
-    "DV-11n-mid-fcfs-private-residual.pt",
-    "DV-11n-mid-p3-fcfs-private-residual.pt",
-    "DV-11n-mid-p3_illumination_residual_fusion.pt",
-    "DV-11n-mid-p3_lifadd.pt",
+    "DV-11n-mid-p2-offset.pt",
+    "DV-11n-mid-p3-no-offset.pt",
+    # "DV-11n-mid-fcfs-fcfsshared.pt",
+    # "DV-11n-mid-p3-fcfsshared.pt",
+    # "DV-11n-mid-fcfs-private-residual.pt",
+    # "DV-11n-mid-p3-fcfs-private-residual.pt",
+    # "DV-11n-mid-p3_illumination_residual_fusion.pt",
+    # "DV-11n-mid-p3_lifadd.pt",
     "DV-11n-mid.pt",
     # "DV-11n-mid_bidirectional_kv_guided.pt",
     # "DV-11n-mid_bidirectional_value_guided.pt",
-    "DV-11n-mid_cifusion.pt",
-    "DV-11n-mid_cifusion_v6.pt",
-    "DV-11n-mid_illumination_residual_fusion.pt",
-    "DV-11n-mid-p3-spaf.pt",
-    "DV-11n-mid-spaf.pt",
+    # "DV-11n-mid_cifusion.pt",
+    # "DV-11n-mid_cifusion_v6.pt",
+    # "DV-11n-mid_illumination_residual_fusion.pt",
+    # "DV-11n-mid-p3-spaf.pt",
+    # "DV-11n-mid-spaf.pt",
     # "DV-11n-mid_rgb_guided_ir.pt",
     # "DV-11n-mid_rgb_value_guided_ir.pt",
 ]
@@ -55,16 +57,27 @@ def get_weight_size(path):
     return f"{os.stat(path).st_size / 1024 / 1024:.1f}"
 
 
-def get_model_profile(model, imgsz):
+def get_model_profile(model, imgsz, channels=4):
     n_l, n_p, n_g, flops = model_info(model.model, imgsz=imgsz)
-    if flops:
+    if flops and flops > 0:
+        return n_l, n_p, n_g, flops
+
+    # Some older multimodal checkpoints contain stale/missing channel metadata.
+    # Retry THOP with the same explicit channel count used by validation.
+    flops = get_flops(model.model, imgsz=imgsz, channels=channels)
+    if flops and flops > 0:
         return n_l, n_p, n_g, flops
 
     try:
-        flops = get_flops_with_torch_profiler(model.model, imgsz=imgsz)
+        flops = get_flops_with_torch_profiler(model.model, imgsz=imgsz, channels=channels)
     except Exception as e:
         print(f"torch.profiler FLOPs failed: {e}")
         flops = 0.0
+    if not flops or flops <= 0:
+        print(
+            "Warning: GFLOPs could not be calculated for this model; "
+            "the summary will show N/A instead of treating the failure as 0 GFLOPs."
+        )
     return n_l, n_p, n_g, flops
 
 
@@ -131,7 +144,7 @@ def summarize_result(model, result, weight_path, imgsz):
     inference = result.speed["inference"]
     postprocess = result.speed["postprocess"]
     total = preprocess + inference + postprocess
-    n_l, n_p, n_g, flops = get_model_profile(model, imgsz)
+    n_l, n_p, n_g, flops = get_model_profile(model, imgsz, channels=4)
 
     length = result.box.p.size
     f1 = float(np.mean(result.box.f1[:length])) if length else np.nan

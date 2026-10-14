@@ -419,7 +419,7 @@ def model_info_for_loggers(trainer):
     return results
 
 
-def get_flops(model, imgsz=640):
+def get_flops(model, imgsz=640, channels=None):
     """Calculate FLOPs (floating point operations) for a model in GFLOPs.
 
     Attempts two calculation methods: first with a stride-based tensor for efficiency, then falls back to full image
@@ -428,6 +428,7 @@ def get_flops(model, imgsz=640):
     Args:
         model (nn.Module): The model to calculate FLOPs for.
         imgsz (int | list, optional): Input image size.
+        channels (int, optional): Explicit model input channels.
 
     Returns:
         (float): The model's GFLOPs (billions of floating point operations).
@@ -444,7 +445,8 @@ def get_flops(model, imgsz=640):
     try:
         model = de_parallel(model)
         p = next(model.parameters())
-        ch = int(model.yaml['ch'])
+        model_yaml = getattr(model, "yaml", {})
+        ch = int(channels or model_yaml.get("ch") or model_yaml.get("channels") or p.shape[1])
         if not isinstance(imgsz, list):
             imgsz = [imgsz, imgsz]  # expand if int/float
         try:
@@ -463,12 +465,14 @@ def get_flops(model, imgsz=640):
         return 0.0
 
 
-def get_flops_with_torch_profiler(model, imgsz=640):
+def get_flops_with_torch_profiler(model, imgsz=640, channels=None):
     """Compute model FLOPs using torch profiler (alternative to thop package, but 2-10x slower).
 
     Args:
         model (nn.Module): The model to calculate FLOPs for.
         imgsz (int | list, optional): Input image size.
+        channels (int, optional): Explicit model input channels. Use this when
+            checkpoint YAML metadata may not match the actual dataloader input.
 
     Returns:
         (float): The model's GFLOPs (billions of floating point operations).
@@ -477,19 +481,24 @@ def get_flops_with_torch_profiler(model, imgsz=640):
         return 0.0
     model = unwrap_model(model)
     p = next(model.parameters())
+    # The second dimension of the first parameter is not a reliable input-channel
+    # count (especially for multimodal models). Keep this consistent with
+    # get_flops(), which reads the configured model input channels.
+    model_yaml = getattr(model, "yaml", {})
+    ch = int(channels or model_yaml.get("ch") or model_yaml.get("channels") or p.shape[1])
     if not isinstance(imgsz, list):
         imgsz = [imgsz, imgsz]  # expand if int/float
     try:
         # Use stride size for input tensor
         stride = (max(int(model.stride.max()), 32) if hasattr(model, "stride") else 32) * 2  # max stride
-        im = torch.empty((1, p.shape[1], stride, stride), device=p.device)  # input image in BCHW format
+        im = torch.empty((1, ch, stride, stride), device=p.device)  # input image in BCHW format
         with torch.profiler.profile(with_flops=True) as prof:
             model(im)
         flops = sum(x.flops for x in prof.key_averages()) / 1e9
         flops = flops * imgsz[0] / stride * imgsz[1] / stride  # 640x640 GFLOPs
     except Exception:
         # Use actual image size for input tensor (i.e. required for RTDETR models)
-        im = torch.empty((1, p.shape[1], *imgsz), device=p.device)  # input image in BCHW format
+        im = torch.empty((1, ch, *imgsz), device=p.device)  # input image in BCHW format
         with torch.profiler.profile(with_flops=True) as prof:
             model(im)
         flops = sum(x.flops for x in prof.key_averages()) / 1e9

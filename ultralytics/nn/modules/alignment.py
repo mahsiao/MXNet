@@ -8,8 +8,60 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch import Tensor
 from torchvision.ops import DeformConv2d
+
+
+class StableModulatedDeformConv2d(nn.Module):
+    """DCNv2 implemented with PyTorch operators instead of a custom CUDA kernel."""
+
+    def __init__(self, channels: int, kernel_size: int, padding: int) -> None:
+        super().__init__()
+        self.channels = channels
+        self.kernel_size = kernel_size
+        self.padding = padding
+        self.weight = nn.Parameter(torch.empty(channels, channels, kernel_size, kernel_size))
+        nn.init.kaiming_uniform_(self.weight, a=5**0.5)
+
+    def forward(self, x: Tensor, offset: Tensor, mask: Tensor) -> Tensor:
+        batch, channels, height, width = x.shape
+        points = self.kernel_size * self.kernel_size
+        expected_offset = (batch, 2 * points, height, width)
+        expected_mask = (batch, points, height, width)
+        if tuple(offset.shape) != expected_offset or tuple(mask.shape) != expected_mask:
+            raise ValueError(
+                f"Invalid deformable-convolution tensors: offset={tuple(offset.shape)}, "
+                f"mask={tuple(mask.shape)}, expected offset={expected_offset}, mask={expected_mask}."
+            )
+        if channels != self.channels:
+            raise ValueError(f"Expected {self.channels} input channels, got {channels}.")
+
+        # torchvision orders each offset pair as (dy, dx).
+        coord_dtype = offset.dtype
+        base_y = torch.arange(height, device=x.device, dtype=coord_dtype).view(1, height, 1)
+        base_x = torch.arange(width, device=x.device, dtype=coord_dtype).view(1, 1, width)
+        output = None
+        point = 0
+        for kernel_y in range(self.kernel_size):
+            for kernel_x in range(self.kernel_size):
+                sample_y = base_y + kernel_y - self.padding + offset[:, 2 * point]
+                sample_x = base_x + kernel_x - self.padding + offset[:, 2 * point + 1]
+                # Pixel-centre normalization; unlike align_corners=True this also handles H/W == 1.
+                grid_y = (2.0 * (sample_y + 0.5) / height) - 1.0
+                grid_x = (2.0 * (sample_x + 0.5) / width) - 1.0
+                grid = torch.stack((grid_x, grid_y), dim=-1)
+                sampled = F.grid_sample(
+                    x, grid, mode="bilinear", padding_mode="zeros", align_corners=False
+                )
+                sampled = sampled * mask[:, point : point + 1]
+                point_output = F.conv2d(
+                    sampled,
+                    self.weight[:, :, kernel_y, kernel_x].unsqueeze(-1).unsqueeze(-1),
+                )
+                output = point_output if output is None else output + point_output
+                point += 1
+        return output
 
 
 class SpatialAttention(nn.Module):
@@ -304,6 +356,7 @@ class OffsetGuidedDeformableAlignment(nn.Module):
         max_residual_offset: float | None = None,
         use_offset_prior: bool = True,
         use_alignment_residual: bool = False,
+        deform_backend: str = "pytorch",
     ) -> None:
         super().__init__()
 
@@ -332,22 +385,28 @@ class OffsetGuidedDeformableAlignment(nn.Module):
             max_residual_offset=max_residual_offset,
         )
 
-        self.deformable_conv = DeformConv2d(
-            in_channels=channels,
-            out_channels=channels,
-            kernel_size=kernel_size,
-            stride=1,
-            padding=padding,
-            dilation=1,
-            groups=1,
-            bias=False,
-        )
+        if deform_backend == "pytorch":
+            self.deformable_conv = StableModulatedDeformConv2d(channels, kernel_size, padding)
+        elif deform_backend == "torchvision":
+            self.deformable_conv = DeformConv2d(
+                in_channels=channels,
+                out_channels=channels,
+                kernel_size=kernel_size,
+                stride=1,
+                padding=padding,
+                dilation=1,
+                groups=1,
+                bias=False,
+            )
+        else:
+            raise ValueError("deform_backend must be 'pytorch' or 'torchvision'.")
 
         self.norm = nn.BatchNorm2d(channels)
         self.activation = nn.SiLU(inplace=True)
 
         self.use_alignment_residual = use_alignment_residual
         self.use_offset_prior = use_offset_prior
+        self.deform_backend = deform_backend
 
     @staticmethod
     def _validate_inputs(f_ir: Tensor, f_rgb: Tensor) -> None:
